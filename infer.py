@@ -48,7 +48,7 @@ def infer_single(
     model,
     tokenizer,
     image_path: str,
-    output_dir: str = "./output",
+    page_output_dir: str,
     mode: str = "markdown",
 ):
     """对单张图片执行 OCR 推理"""
@@ -57,18 +57,25 @@ def infer_single(
     else:
         prompt = "<image>\nFree OCR. "
 
-    result = model.infer(
+    os.makedirs(page_output_dir, exist_ok=True)
+
+    model.infer(
         tokenizer,
         prompt=prompt,
         image_file=image_path,
-        output_path=output_dir,
+        output_path=page_output_dir,
         base_size=1024,
         image_size=768,
         crop_mode=True,
-        save_results=False,  # 不让模型保存，我们自己合并保存
+        save_results=True,
     )
 
-    return result
+    # 读取模型保存的结果
+    result_file = os.path.join(page_output_dir, "result.mmd")
+    if os.path.exists(result_file):
+        with open(result_file, "r", encoding="utf-8") as f:
+            return f.read()
+    return ""
 
 
 def infer(
@@ -80,6 +87,7 @@ def infer(
 ):
     """执行 OCR 推理，支持图片和 PDF"""
     os.makedirs(output_dir, exist_ok=True)
+    output_file = os.path.join(output_dir, "full_result.md")
 
     # 检查是否为 PDF
     if file_path.lower().endswith(".pdf"):
@@ -87,13 +95,25 @@ def infer(
         image_paths = pdf_to_images(file_path, output_dir)
         print(f"共 {len(image_paths)} 页")
 
+        # 清空输出文件
+        with open(output_file, "w", encoding="utf-8") as f:
+            f.write("")
+
         results = []
         for i, image_path in enumerate(image_paths):
             print(f"处理第 {i+1}/{len(image_paths)} 页...")
-            result = infer_single(model, tokenizer, image_path, output_dir, mode)
-            results.append(f"## Page {i+1}\n\n{result}")
+            # 每页用独立子目录，避免 result.mmd 被覆盖
+            page_output_dir = os.path.join(output_dir, f"page_{i+1:03d}")
+            result = infer_single(model, tokenizer, image_path, page_output_dir, mode)
+            page_content = f"## Page {i+1}\n\n{result}\n\n---\n\n"
 
-        return "\n\n---\n\n".join(results)
+            # 逐页追加到文件
+            with open(output_file, "a", encoding="utf-8") as f:
+                f.write(page_content)
+
+            results.append(page_content)
+
+        return "".join(results)
     else:
         return infer_single(model, tokenizer, file_path, output_dir, mode)
 
@@ -119,10 +139,7 @@ def main():
     model, tokenizer = load_model(args.device)
     result = infer(model, tokenizer, args.image, args.output, args.mode)
 
-    # 保存合并后的结果
     output_file = os.path.join(args.output, "full_result.md")
-    with open(output_file, "w", encoding="utf-8") as f:
-        f.write(result)
     print(f"\n结果已保存到: {output_file}")
 
     print("\n=== 识别结果 ===")
