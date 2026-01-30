@@ -1,0 +1,15 @@
+# PyTorch 单独装，见 README
+transformers==4.46.3
+tokenizers==0.20.3
+einops
+addict
+easydict
+pyyaml
+tqdm
+psutil
+click
+anyio
+httpx
+attrs
+pillow<12.0
+# flash-attn 单独装，编译慢
