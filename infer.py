@@ -65,7 +65,7 @@ def infer_single(
         base_size=1024,
         image_size=768,
         crop_mode=True,
-        save_results=True,
+        save_results=False,  # 不让模型保存，我们自己合并保存
     )
 
     return result
