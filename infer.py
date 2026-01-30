@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
 DeepSeek-OCR-2 推理脚本
-用法: python infer.py <image_path> [--output <output_dir>] [--mode ocr|markdown]
+用法: python infer.py <image_or_pdf_path> [--output <output_dir>] [--mode ocr|markdown]
 """
 
 import argparse
 import os
+import tempfile
 import torch
 from transformers import AutoModel, AutoTokenizer
 
@@ -28,29 +29,33 @@ def load_model(device: str = "cuda:0"):
     return model, tokenizer
 
 
-def infer(
+def pdf_to_images(pdf_path: str, output_dir: str):
+    """将 PDF 转换为图片列表"""
+    from pdf2image import convert_from_path
+
+    images = convert_from_path(pdf_path, dpi=200)
+    image_paths = []
+
+    for i, image in enumerate(images):
+        image_path = os.path.join(output_dir, f"page_{i+1:03d}.png")
+        image.save(image_path, "PNG")
+        image_paths.append(image_path)
+
+    return image_paths
+
+
+def infer_single(
     model,
     tokenizer,
     image_path: str,
     output_dir: str = "./output",
     mode: str = "markdown",
 ):
-    """
-    执行 OCR 推理
-
-    Args:
-        model: 加载的模型
-        tokenizer: 分词器
-        image_path: 图片路径
-        output_dir: 输出目录
-        mode: "markdown" 或 "ocr"
-    """
+    """对单张图片执行 OCR 推理"""
     if mode == "markdown":
         prompt = "<image>\n<|grounding|>Convert the document to markdown. "
     else:
         prompt = "<image>\nFree OCR. "
-
-    os.makedirs(output_dir, exist_ok=True)
 
     result = model.infer(
         tokenizer,
@@ -66,9 +71,36 @@ def infer(
     return result
 
 
+def infer(
+    model,
+    tokenizer,
+    file_path: str,
+    output_dir: str = "./output",
+    mode: str = "markdown",
+):
+    """执行 OCR 推理，支持图片和 PDF"""
+    os.makedirs(output_dir, exist_ok=True)
+
+    # 检查是否为 PDF
+    if file_path.lower().endswith(".pdf"):
+        print(f"检测到 PDF 文件，正在转换为图片...")
+        image_paths = pdf_to_images(file_path, output_dir)
+        print(f"共 {len(image_paths)} 页")
+
+        results = []
+        for i, image_path in enumerate(image_paths):
+            print(f"处理第 {i+1}/{len(image_paths)} 页...")
+            result = infer_single(model, tokenizer, image_path, output_dir, mode)
+            results.append(f"## Page {i+1}\n\n{result}")
+
+        return "\n\n---\n\n".join(results)
+    else:
+        return infer_single(model, tokenizer, file_path, output_dir, mode)
+
+
 def main():
     parser = argparse.ArgumentParser(description="DeepSeek-OCR-2 推理")
-    parser.add_argument("image", help="输入图片路径")
+    parser.add_argument("image", help="输入图片或 PDF 路径")
     parser.add_argument("--output", "-o", default="./output", help="输出目录")
     parser.add_argument(
         "--mode", "-m",
@@ -81,7 +113,7 @@ def main():
     args = parser.parse_args()
 
     if not os.path.exists(args.image):
-        print(f"错误: 图片不存在 {args.image}")
+        print(f"错误: 文件不存在 {args.image}")
         return 1
 
     model, tokenizer = load_model(args.device)

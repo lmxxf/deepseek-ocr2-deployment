@@ -56,14 +56,18 @@ pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 \
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
 
 # ARM (aarch64) + Blackwell 架构 (如 DGX Spark GB10):
-# Blackwell (sm_121) 太新，需要 PyTorch nightly 版本
-pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu126
+# Blackwell (sm_121) 太新，需要 PyTorch nightly + CUDA 12.8
+pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu128
 ```
 
 ### 4. 安装依赖
 
 ```bash
 pip install -r requirements.txt
+
+# PDF 支持（可选）
+pip install pdf2image
+sudo apt install poppler-utils  # pdf2image 需要
 ```
 
 ### 5. （可选）安装 flash-attn 加速
@@ -81,14 +85,17 @@ pip install flash-attn==2.7.3 --no-build-isolation
 ## 使用
 
 ```bash
-# 文档转 Markdown（保留格式、表格）
+# 图片 OCR
 python infer.py your_document.jpg --mode markdown
 
-# 纯 OCR（只提取文字）
+# PDF OCR（自动逐页转换）
+python infer.py your_document.pdf --mode markdown
+
+# 纯 OCR（只提取文字，不保留格式）
 python infer.py your_document.jpg --mode ocr
 
 # 指定输出目录
-python infer.py your_document.jpg -o ./results
+python infer.py your_document.pdf -o ./results
 ```
 
 ## 两种模式
