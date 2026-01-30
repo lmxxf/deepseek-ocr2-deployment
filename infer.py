@@ -119,6 +119,12 @@ def main():
     model, tokenizer = load_model(args.device)
     result = infer(model, tokenizer, args.image, args.output, args.mode)
 
+    # 保存合并后的结果
+    output_file = os.path.join(args.output, "full_result.md")
+    with open(output_file, "w", encoding="utf-8") as f:
+        f.write(result)
+    print(f"\n结果已保存到: {output_file}")
+
     print("\n=== 识别结果 ===")
     print(result)
 
