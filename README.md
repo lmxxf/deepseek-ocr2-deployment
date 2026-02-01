@@ -60,6 +60,21 @@ pip install torch torchvision torchaudio --index-url https://download.pytorch.or
 pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu128
 ```
 
+**验证 CUDA 是否可用：**
+
+```bash
+python -c "import torch; print(torch.cuda.is_available(), torch.version.cuda)"
+# 应输出: True 12.8 (或对应的 CUDA 版本)
+```
+
+**如果显示 False 或报错 "Torch not compiled with CUDA enabled"：**
+
+```bash
+# 卸载重装
+pip uninstall torch torchvision torchaudio -y
+# 重新执行上面对应架构的安装命令
+```
+
 ### 4. 安装依赖
 
 ```bash
@@ -104,6 +119,72 @@ python infer.py your_document.pdf -o ./results
 |------|------|--------|
 | markdown | 文档转换，保留表格/格式 | `<image>\n<\|grounding\|>Convert the document to markdown.` |
 | ocr | 纯文字提取 | `<image>\nFree OCR.` |
+
+## API 服务
+
+启动 HTTP 服务，供其他机器远程调用：
+
+```bash
+# 安装额外依赖
+pip install fastapi uvicorn[standard] python-multipart
+
+# 启动服务（默认监听 0.0.0.0:8000）
+python server.py
+
+# 指定端口和设备
+python server.py --host 0.0.0.0 --port 8000 --device cuda:0
+```
+
+### API 端点
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/ocr` | POST | Base64 方式提交 |
+| `/ocr/upload` | POST | 文件上传方式 |
+| `/health` | GET | 健康检查 |
+| `/docs` | GET | Swagger 文档 |
+
+### 调用示例
+
+**文件上传方式（curl）：**
+
+```bash
+# 本地测试
+curl -X POST "http://localhost:8000/ocr/upload" \
+  -F "file=@test.pdf" \
+  -F "mode=markdown"
+
+# 远程调用
+curl -X POST "http://<服务器IP>:8000/ocr/upload" \
+  -F "file=@test.pdf" \
+  -F "mode=markdown"
+```
+
+**Base64 方式（Python）：**
+
+```python
+import base64
+import requests
+
+with open("test.pdf", "rb") as f:
+    b64 = base64.b64encode(f.read()).decode()
+
+resp = requests.post("http://<服务器IP>:8000/ocr", json={
+    "image_base64": b64,
+    "filename": "test.pdf",  # 以 .pdf 结尾则按 PDF 处理
+    "mode": "markdown"       # markdown 或 ocr
+})
+print(resp.json()["text"])
+```
+
+**响应格式：**
+
+```json
+{
+  "text": "识别结果...",
+  "pages": 1
+}
+```
 
 ## 参考
 
